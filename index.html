@@ -502,6 +502,41 @@ window.__loadMapScripts = function(done){
 <script>
 (function(){
   "use strict";
+
+  /* --- Medición de tiempo de carga (para saber si el Hub cargó completo o a la mitad) --- */
+  var cargaInicio = (window.performance && window.performance.timing) ? window.performance.timing.navigationStart : Date.now();
+  var cargaCompleta = false;
+  function fbTrackCarga(eventName, params){
+    try { if (typeof window.fbq === "function") window.fbq("trackCustom", eventName, params || {}); } catch (e) {}
+  }
+  function tiempoCarga(){
+    if (window.performance && window.performance.timing) {
+      var t = window.performance.timing;
+      return {
+        dom: t.domContentLoadedEventEnd - t.navigationStart,
+        completo: t.loadEventEnd - t.navigationStart
+      };
+    }
+    return { dom: 0, completo: 0 };
+  }
+  window.addEventListener("load", function(){
+    cargaCompleta = true;
+    setTimeout(function(){
+      var tiempos = tiempoCarga();
+      fbTrackCarga("CargaCompleta", { tiempo_ms: tiempos.completo, tiempo_dom_ms: tiempos.dom });
+    }, 100);
+  });
+  window.addEventListener("pagehide", function(){
+    if (!cargaCompleta) {
+      var ahora = Date.now();
+      var transcurrido = ahora - cargaInicio;
+      var estado = "empezando";
+      if (document.readyState === "complete") estado = "casi_completo";
+      else if (document.readyState === "interactive") estado = "dom_listo";
+      fbTrackCarga("CargaIncompleta", { tiempo_ms: transcurrido, estado: estado });
+    }
+  });
+
   function init(){
 
   /* --- Estado según la hora de Ciudad de México --- */
